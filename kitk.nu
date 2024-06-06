@@ -3,6 +3,7 @@
 use std log
 
 const PRJ_NAME = "pic_programmer" # TODO: Change
+# const PRJ_DIR = ""
 
 def setup-output-dir [] {
     let output_prefix = ($env | get -i OUTPUT_PREFIX | default 'fab')
@@ -67,8 +68,23 @@ export def drc [
 }
 
 # Generate gerbers
-export def gerbers [] {
+# FIXME: Needs to act on correct pcb filename - too tired
+export def gerbers [
+    output_dir: path
+] {
+    kicad-cli pcb export gerbers $PRJ_NAME --no-protel-ext -o ([$output_dir, "gerbers"] | path join)
+        | complete
+        | with-stage "gerbers"
+}
 
+# Generate drill files
+# FIXME: Needs to act on correct pcb filename - too tired
+export def drill [
+    output_dir: path
+] {
+    kicad-cli pcb export drill --map-format gerberx2 --generate-map --format gerber ([$output_dir, "gerbers"] | path join)
+        | complete
+        | with-stage "drill"
 }
 
 # Test design
@@ -93,6 +109,15 @@ export def test [
 # Generate fab files
 export def gen-fab [] {
     let output_dir = (setup-output-dir)
+
+    let gerbers_output = (gerbers $output_dir)
+    let drill_output = (drill $output_dir)
+
+    let gen_fab_output = ([$gerbers_output, $drill_output] | flatten)
+    let gen_fab_output_path = ([$output_dir, "gen-fab-log.json"] | path join)
+    $gen_fab_output | to json | save $gen_fab_output_path
+
+    log info $"Fab generation file output: ($gen_fab_output_path)"
 }
 
 export def main [] {}
